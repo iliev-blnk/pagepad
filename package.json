@@ -39,10 +39,11 @@
     }
   },
   "scripts": {
-    "build": "tsup",
-    "test": "vitest run",
+    "build:ui": "node scripts/build-ui.mjs",
+    "build": "node scripts/build-ui.mjs && tsup",
+    "test": "node scripts/build-ui.mjs && vitest run",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "node scripts/build-ui.mjs && tsc --noEmit",
     "lint": "biome check ."
   },
   "peerDependencies": {
