@@ -69,7 +69,8 @@ the volume slider.
 host.on('*', (action, value) => log(action, value)) // every action
 const off = host.on('next', next)                  // returns an unsubscribe function
 host.pairUrl                                       // place the QR code yourself
-host.close()
+host.onPairUrl((url) => drawQR(url))               // the URL changes if the session is renewed
+host.close()                                       // ends the session; the phone is told
 ```
 
 ## Custom remotes
@@ -130,6 +131,15 @@ const relay = createRelay({ store })
 app.all('/api/pad', (c) => relay.handler(c.req.raw))
 ```
 
+**Cross-origin**
+
+The relay answers same-origin requests only. If the page or a custom remote lives on another
+origin, list it:
+
+```ts
+createRelay({ store, allowOrigin: ['https://slides.example.com'] })
+```
+
 **Node and Express**
 
 ```ts
@@ -145,7 +155,8 @@ The page creates a session and gets a session id, a host token and a secret. The
 the relay URL with the session id in the query and the secret in the `#fragment`, which
 browsers never send to the server, so it stays out of request logs. The page long-polls the
 relay for commands and posts its state, and the phone sends commands and reads state once a
-second.
+second. When the page closes it ends the session, and the phone shows that it has to be
+scanned again.
 
 Long-polling instead of WebSockets is deliberate. Serverless functions cannot hold a socket
 open, and a poll that resolves wakes up a page that the browser has throttled in a background
@@ -155,11 +166,21 @@ pocket cannot replay old taps.
 ## Limits
 
 - State up to 16 KB, command values up to 1 KB, action names up to 64 characters.
-- The queue keeps the last 50 commands. Sessions expire after an hour without the page polling.
+- The queue keeps the last 50 commands.
+- A session ends when the page closes or reloads, or two minutes after the page stops
+  responding. The phone then shows "Session ended".
 - No rate limiting. If your relay URL is public, put it behind your own limiter.
-- Cost: a waiting page reads the store about every 750 ms. On the Upstash free tier (500K
-  commands a month) that is roughly 50 hours of open pages a month. Raise `pollStepMs` in
-  `createRelay` to trade a little latency for fewer reads.
+- Cost: a waiting page reads the store about every 750 ms, and a paired phone reads it once a
+  second. On the Upstash free tier (500K commands a month) that is roughly 25 hours a month of
+  a page with a phone attached. Raise `pollStepMs` in `createRelay` to trade a little latency
+  for fewer reads.
+
+## Security
+
+Anyone who has the QR code or the pair link controls the page until the session ends. The
+secret in the link does not rotate. If the page is on a projector or a shared screen, hide the
+code once your phone is paired (`host.hideQR()` or the × on the card), and reload the page to
+cut off everyone who scanned it.
 
 ## Demos
 
