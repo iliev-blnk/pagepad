@@ -24,9 +24,14 @@
       <li><a href="player.html"><strong>Player</strong><span>Play, skip, volume, fade</span></a></li>
       <li><a href="game.html"><strong>Sketch</strong><span>Draw with four buttons</span></a></li>
     </ul>
-    <p class="hint">Each page shows a QR code. Scan it with your phone to get a remote built from the page's controls.
-      Open this page on your computer through its network address (printed by the demo server), not <code>localhost</code>, so the phone can reach it.</p>
+    <p class="hint">Open a demo on your computer and scan its QR code with your phone. The phone gets a remote built from the page's controls.</p>
+    <p class="hint" id="local" hidden>Running locally: open this page through your computer's network address (printed by the demo server), not <code>localhost</code>, so the phone can reach it.</p>
     <p class="hint"><a href="https://github.com/iliev-blnk/pagepad">Source on GitHub</a></p>
   </main>
+  <script>
+    if (/^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(location.hostname)) {
+      document.getElementById('local').hidden = false
+    }
+  </script>
 </body>
 </html>

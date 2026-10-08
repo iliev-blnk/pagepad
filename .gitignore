@@ -4,3 +4,5 @@ src/ui/generated.ts
 .superpowers
 *.log
 media/*.png
+deploy/cloudflare/site
+deploy/cloudflare/.wrangler

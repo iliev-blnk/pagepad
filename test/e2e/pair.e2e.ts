@@ -3,24 +3,31 @@ import { existsSync } from 'node:fs'
 import { type Browser, chromium } from 'playwright-core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-let server: ChildProcess
+let server: ChildProcess | undefined
 let browser: Browser
 let base: string
 
 beforeAll(async () => {
-  if (!existsSync('dist/server/index.js')) throw new Error('Run `pnpm build` before the e2e test.')
-  server = spawn(process.execPath, ['demo/server.mjs'], { env: { ...process.env, PORT: '0' } })
-  base = await new Promise<string>((resolve, reject) => {
-    server.stdout?.on('data', (chunk: Buffer) => {
-      const match = /http:\/\/localhost:\d+/.exec(chunk.toString())
-      if (match) resolve(match[0])
-    })
-    server.on('exit', (code) => reject(new Error(`demo server exited with ${code}`)))
-  })
+  // E2E_BASE runs the suite against an already running demo, e.g. `wrangler dev` or production.
+  if (process.env.E2E_BASE) base = process.env.E2E_BASE.replace(/\/$/, '')
+  else base = await startLocalServer()
   browser = await chromium.launch({
     executablePath: process.env.CHROMIUM_PATH ?? '/usr/bin/chromium',
   })
 })
+
+async function startLocalServer() {
+  if (!existsSync('dist/server/index.js')) throw new Error('Run `pnpm build` before the e2e test.')
+  const child = spawn(process.execPath, ['demo/server.mjs'], { env: { ...process.env, PORT: '0' } })
+  server = child
+  return new Promise<string>((resolve, reject) => {
+    child.stdout?.on('data', (chunk: Buffer) => {
+      const match = /http:\/\/localhost:\d+/.exec(chunk.toString())
+      if (match) resolve(match[0])
+    })
+    child.on('exit', (code) => reject(new Error(`demo server exited with ${code}`)))
+  })
+}
 
 afterAll(async () => {
   await browser?.close()

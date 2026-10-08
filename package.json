@@ -60,7 +60,10 @@
     "test": "node scripts/build-ui.mjs && vitest run",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "typecheck": "node scripts/build-ui.mjs && tsc --noEmit",
-    "lint": "biome check ."
+    "lint": "biome check .",
+    "demo:build": "pnpm build && node scripts/build-site.mjs",
+    "demo:dev": "pnpm demo:build && wrangler dev --config deploy/cloudflare/wrangler.jsonc",
+    "demo:deploy": "pnpm demo:build && wrangler deploy --config deploy/cloudflare/wrangler.jsonc"
   },
   "peerDependencies": {
     "@vercel/functions": ">=2"
@@ -80,6 +83,7 @@
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "uqr": "^0.1.3",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.3",
+    "wrangler": "^4.148.0"
   }
 }
