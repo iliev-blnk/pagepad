@@ -10,7 +10,10 @@ interface Queue {
   items: Command[]
 }
 
-/** In-process store for development and tests. Not shared between server instances. */
+/**
+ * In-process store for development and tests. Not shared between server instances.
+ * Values are copied in and out so it behaves like a networked store.
+ */
 export function memoryStore(): Store {
   const data = new Map<string, Entry>()
 
@@ -21,11 +24,11 @@ export function memoryStore(): Store {
       data.delete(key)
       return undefined
     }
-    return entry.value as T
+    return structuredClone(entry.value) as T
   }
 
   const write = (key: string, value: unknown, ttlSec: number) => {
-    data.set(key, { value, expires: Date.now() + ttlSec * 1000 })
+    data.set(key, { value: structuredClone(value), expires: Date.now() + ttlSec * 1000 })
   }
 
   return {

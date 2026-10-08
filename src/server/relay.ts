@@ -151,8 +151,9 @@ export function createRelay(options: RelayOptions) {
     const session = await load(id)
     if (!session) return fail('NOT_FOUND')
     if (!(await check(session.hostHash, bearer(req)))) return fail('UNAUTHORIZED')
+    // No session write here: it could overwrite controls posted meanwhile.
+    // State posts (at least every 10 s) keep the session alive.
     const k = keys(id)
-    await store.set(k.session, session, SESSION_TTL)
     const since = Number(params.get('since')) || 0
     const wait = Math.max(0, Number(params.get('wait')) || 0) * 1000
     const deadline = Date.now() + Math.min(wait, maxWaitMs)

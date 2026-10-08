@@ -45,6 +45,17 @@ describe('memoryStore', () => {
     expect([...ids].sort((a, b) => a - b)).toEqual(Array.from({ length: 20 }, (_, i) => i + 1))
   })
 
+  it('returns copies, like a networked store would', async () => {
+    const store = memoryStore()
+    const value = { controls: null as unknown }
+    await store.set('k', value, 60)
+    value.controls = 'changed after set'
+    const read = await store.get<{ controls: unknown }>('k')
+    expect(read?.controls).toBeNull()
+    if (read) read.controls = 'changed after get'
+    expect((await store.get<{ controls: unknown }>('k'))?.controls).toBeNull()
+  })
+
   it('is atomic', () => {
     expect(memoryStore().atomic).toBe(true)
   })
