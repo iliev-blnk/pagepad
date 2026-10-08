@@ -4,6 +4,9 @@
 
 Turn a phone into a remote for any web page. Scan a QR code. No app, no WebSocket server.
 
+**[Try the live demo →](https://pagepad-demo.pagepad.workers.dev)** Open it on a computer and
+scan a QR code with your phone.
+
 ![A music player on a laptop controlled from a phone](media/demo.gif)
 
 The page declares its controls, and pagepad builds the phone UI from them. The relay is a
@@ -124,7 +127,21 @@ export const maxDuration = 30
 export const { GET, POST } = createRelay({ store })
 ```
 
-**Hono, Cloudflare Workers, Bun, Deno**
+**Cloudflare Workers with a Durable Object**
+
+A Durable Object handles its requests on one thread, so `memoryStore` inside it is consistent
+and needs no external database. This is how the live demo runs; see `deploy/cloudflare/worker.js`.
+
+```ts
+export class PadRelay extends DurableObject {
+  relay = createRelay({ store: memoryStore() })
+  fetch(request) {
+    return this.relay.handler(request)
+  }
+}
+```
+
+**Hono, Bun, Deno**
 
 ```ts
 const relay = createRelay({ store })
@@ -190,7 +207,8 @@ pnpm build
 node demo/server.mjs
 ```
 
-The server prints a local address and a network address. Open the network address on your
+Or use the hosted copy at https://pagepad-demo.pagepad.workers.dev. Locally, the server prints a
+local address and a network address. Open the network address on your
 computer so your phone can reach it, then pick a demo: slides, a music player with synthesised
 tracks, or a sketch pad.
 

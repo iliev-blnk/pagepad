@@ -8,5 +8,9 @@
     "binding": "ASSETS",
     "run_worker_first": ["/api/*"]
   },
+  "durable_objects": {
+    "bindings": [{ "name": "PAD", "class_name": "PadRelay" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["PadRelay"] }],
   "observability": { "enabled": true }
 }
