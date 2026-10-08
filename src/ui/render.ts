@@ -51,8 +51,24 @@ function throttle<T>(fn: (v: T) => void, ms: number) {
 type Updater = (state: Record<string, unknown>) => void
 
 export function renderApp(root: HTMLElement, pad: PadLike) {
-  const send = (action: string, value: unknown = null) => {
-    pad.send(action, value).catch(() => {})
+  // One request in flight at a time, so commands reach the host in the order
+  // they were made. Queued values for a slider, toggle or select collapse to
+  // the latest; button taps are all kept.
+  const queue: { action: string; value: unknown }[] = []
+  let sending = false
+  const send = (action: string, value: unknown = null, collapse = false) => {
+    const last = queue.at(-1)
+    if (collapse && last?.action === action) last.value = value
+    else queue.push({ action, value })
+    void drain()
+  }
+  async function drain() {
+    if (sending) return
+    sending = true
+    for (let next = queue.shift(); next; next = queue.shift()) {
+      await pad.send(next.action, next.value).catch(() => {})
+    }
+    sending = false
   }
 
   const status = el('p', { className: 'status', textContent: 'Connecting…' })
@@ -75,13 +91,21 @@ export function renderApp(root: HTMLElement, pad: PadLike) {
     sw.setAttribute('role', 'switch')
     sw.setAttribute('aria-checked', 'false')
     sw.setAttribute('aria-label', label)
+    let lastInput = 0
     sw.addEventListener('click', () => {
       const next = sw.getAttribute('aria-checked') !== 'true'
+      lastInput = Date.now()
       sw.setAttribute('aria-checked', String(next))
-      send(key, next)
+      send(key, next, true)
     })
     const row = el('div', { className: 'row' }, el('span', { textContent: label }), sw)
-    return [row, (s) => sw.setAttribute('aria-checked', String(s[key] === true))]
+    return [
+      row,
+      (s) => {
+        if (!(key in s) || Date.now() - lastInput < HOLD_AFTER_INPUT_MS) return
+        sw.setAttribute('aria-checked', String(s[key] === true))
+      },
+    ]
   }
 
   function slider(key: string, [min, max, step = 1]: [number, number, number?]): [Node, Updater] {
@@ -95,7 +119,7 @@ export function renderApp(root: HTMLElement, pad: PadLike) {
     const value = el('span', { className: 'value' })
     let lastInput = 0
     let dragging = false
-    const push = throttle((v: number) => send(key, v), SEND_EVERY_MS)
+    const push = throttle((v: number) => send(key, v, true), SEND_EVERY_MS)
     input.addEventListener('input', () => {
       lastInput = Date.now()
       value.textContent = input.value
@@ -104,9 +128,11 @@ export function renderApp(root: HTMLElement, pad: PadLike) {
     input.addEventListener('pointerdown', () => {
       dragging = true
     })
-    input.addEventListener('pointerup', () => {
-      dragging = false
-    })
+    for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+      input.addEventListener(type, () => {
+        dragging = false
+      })
+    }
     const head = el(
       'div',
       { className: 'row head' },
@@ -127,13 +153,15 @@ export function renderApp(root: HTMLElement, pad: PadLike) {
   }
 
   function select(key: string, options: string[]): [Node, Updater] {
+    let lastInput = 0
     const buttons = options.map((option) => {
       const b = el('button', { type: 'button', textContent: option })
       b.dataset.option = option
       b.setAttribute('aria-pressed', 'false')
       b.addEventListener('click', () => {
+        lastInput = Date.now()
         for (const o of buttons) o.setAttribute('aria-pressed', String(o === b))
-        send(key, option)
+        send(key, option, true)
       })
       return b
     })
@@ -149,6 +177,7 @@ export function renderApp(root: HTMLElement, pad: PadLike) {
     return [
       row,
       (s) => {
+        if (!(key in s) || Date.now() - lastInput < HOLD_AFTER_INPUT_MS) return
         for (const b of buttons) b.setAttribute('aria-pressed', String(s[key] === b.dataset.option))
       },
     ]

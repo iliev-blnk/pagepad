@@ -12,7 +12,9 @@ function fakePad() {
   return {
     sent,
     pad: {
-      send: async (action: string, value?: unknown) => void sent.push({ action, value }),
+      send: async (action: string, value?: unknown): Promise<void> => {
+        sent.push({ action, value })
+      },
       onState: (fn: StateFn) => {
         stateFn = fn
         return () => {}
@@ -25,6 +27,21 @@ function fakePad() {
     push: (state: Record<string, unknown>, controls: Controls) => stateFn({ state, controls }),
     end: () => endFn(),
   }
+}
+
+/** A pad whose sends stay in flight until the test resolves them. */
+function slowPad() {
+  const f = fakePad()
+  const inFlight: Array<() => void> = []
+  f.pad.send = (action: string, value?: unknown) => {
+    f.sent.push({ action, value })
+    return new Promise<void>((r) => inFlight.push(r))
+  }
+  const finish = async () => {
+    inFlight.shift()?.()
+    await vi.advanceTimersByTimeAsync(0)
+  }
+  return { ...f, finish }
 }
 
 let root: HTMLElement
@@ -141,6 +158,50 @@ describe('phone UI', () => {
     expect(slider.value).toBe('80')
   })
 
+  it('keeps a toggle when the host state does not mention it', async () => {
+    const f = fakePad()
+    renderApp(root, f.pad)
+    f.push({}, { fade: { toggle: 'Fade' } })
+    const sw = root.querySelector<HTMLButtonElement>('[role=switch]')
+    sw?.click()
+    f.push({}, { fade: { toggle: 'Fade' } })
+    expect(sw?.getAttribute('aria-checked')).toBe('true')
+    sw?.click()
+    await vi.waitFor(() => expect(f.sent.map((s) => s.value)).toEqual([true, false]))
+  })
+
+  it('does not flip a toggle back on a state read that predates the tap', () => {
+    const f = fakePad()
+    renderApp(root, f.pad)
+    f.push({ fade: false }, { fade: { toggle: 'Fade' } })
+    const sw = root.querySelector<HTMLButtonElement>('[role=switch]')
+    sw?.click()
+    f.push({ fade: false }, { fade: { toggle: 'Fade' } })
+    expect(sw?.getAttribute('aria-checked')).toBe('true')
+  })
+
+  it('keeps the chosen option when the host state does not mention it', () => {
+    const f = fakePad()
+    renderApp(root, f.pad)
+    f.push({ mode: 'b' }, { mode: { select: ['a', 'b'] } })
+    f.push({}, { mode: { select: ['a', 'b'] } })
+    const pressed = [...root.querySelectorAll('[data-option]')].map((o) =>
+      o.getAttribute('aria-pressed'),
+    )
+    expect(pressed).toEqual(['false', 'true'])
+  })
+
+  it('follows host state again after a cancelled drag', () => {
+    const f = fakePad()
+    renderApp(root, f.pad)
+    f.push({ volume: 30 }, { volume: { slider: [0, 100] } })
+    const slider = root.querySelector<HTMLInputElement>('input[type=range]')
+    slider?.dispatchEvent(new Event('pointerdown'))
+    slider?.dispatchEvent(new Event('pointercancel'))
+    f.push({ volume: 55 }, { volume: { slider: [0, 100] } })
+    expect(slider?.value).toBe('55')
+  })
+
   it('tells the user when the session has ended', () => {
     const f = fakePad()
     renderApp(root, f.pad)
@@ -148,5 +209,39 @@ describe('phone UI', () => {
     f.end()
     expect(root.textContent).toContain('Session ended — scan the code again')
     expect(root.querySelector('button')).toBeNull()
+  })
+
+  it('sends one command at a time and keeps every tap', async () => {
+    vi.useFakeTimers()
+    const f = slowPad()
+    renderApp(root, f.pad)
+    f.push({}, { next: { button: 'Next' } })
+    const next = root.querySelector<HTMLButtonElement>('.action')
+    next?.click()
+    next?.click()
+    next?.click()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(f.sent).toHaveLength(1)
+    await f.finish()
+    expect(f.sent).toHaveLength(2)
+    await f.finish()
+    expect(f.sent).toHaveLength(3)
+  })
+
+  it('sends only the latest slider value once the previous send lands', async () => {
+    vi.useFakeTimers()
+    const f = slowPad()
+    renderApp(root, f.pad)
+    f.push({}, { volume: { slider: [0, 100] } })
+    const slider = root.querySelector<HTMLInputElement>('input[type=range]')
+    if (!slider) throw new Error('no slider')
+    for (const v of [10, 20, 30, 40]) {
+      slider.value = String(v)
+      slider.dispatchEvent(new Event('input'))
+      await vi.advanceTimersByTimeAsync(150)
+    }
+    expect(f.sent.map((s) => s.value)).toEqual([10])
+    await f.finish()
+    expect(f.sent.map((s) => s.value)).toEqual([10, 40])
   })
 })
