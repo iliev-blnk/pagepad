@@ -14,7 +14,7 @@ describe('upstashStore', () => {
     const req = up.requests[0]
     expect(req?.url).toBe(URL_)
     expect(req?.auth).toBe('Bearer tok')
-    const [op, script, numKeys, ...rest] = req?.body as string[]
+    const [op, script, numKeys, ...rest] = (req?.body ?? []) as string[]
     expect(op).toBe('EVAL')
     expect(script).toContain("redis.call('INCR', KEYS[2])")
     expect(numKeys).toBe('2')
