@@ -79,7 +79,6 @@ h1 {
   display: grid;
   gap: 8px;
   padding: 8px 0;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
 }
 button {
   font: inherit;
@@ -88,8 +87,9 @@ button {
 }
 .action {
   min-height: 56px;
-  padding: 0 16px;
-  font-size: 17px;
+  padding: 4px 8px;
+  font-size: 16px;
+  line-height: 1.2;
   font-weight: 500;
   background: var(--bg);
   border: 1px solid var(--fg);

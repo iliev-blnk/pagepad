@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Sketch · pagepad</title>
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .stage { flex: 1; display: grid; place-items: center; padding: 24px; }
+    .stage > div { width: min(720px, 100%); }
+    canvas { display: block; width: 100%; aspect-ratio: 3 / 2; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
+    .hint { text-align: center; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <div class="bar">
+    <a class="crumb" href="./">pagepad / <strong>Sketch</strong></a>
+    <button type="button" class="btn" id="pair">Pair phone</button>
+  </div>
+  <div class="stage">
+    <div>
+      <canvas id="c" width="1440" height="960"></canvas>
+      <p class="hint">Draw with the buttons on your phone, or the arrow keys.</p>
+    </div>
+  </div>
+  <script type="module">
+    import { createHost } from '/pagepad/host/index.js'
+
+    const STEP = 48
+    const colors = { ink: null, red: '#e5484d', blue: '#3e63dd', green: '#30a46c' }
+    const canvas = document.getElementById('c')
+    const g = canvas.getContext('2d')
+    const ink = () => getComputedStyle(document.body).color
+    const sketch = { x: canvas.width / 2, y: canvas.height / 2, color: 'ink', strokes: 0 }
+    window.__sketch = sketch
+    let lines = []
+
+    const host = await createHost({ endpoint: '/api/pad' })
+    window.__pagepad = host
+    host.controls({
+      left: { button: '←' },
+      up: { button: '↑' },
+      down: { button: '↓' },
+      right: { button: '→' },
+      color: { select: Object.keys(colors) },
+      clear: { button: 'Clear' },
+    })
+
+    function draw() {
+      g.clearRect(0, 0, canvas.width, canvas.height)
+      g.lineWidth = 10
+      g.lineCap = 'round'
+      for (const l of lines) {
+        g.strokeStyle = colors[l.color] ?? ink()
+        g.beginPath(); g.moveTo(l.x1, l.y1); g.lineTo(l.x2, l.y2); g.stroke()
+      }
+      g.fillStyle = colors[sketch.color] ?? ink()
+      g.beginPath(); g.arc(sketch.x, sketch.y, 14, 0, Math.PI * 2); g.fill()
+      host.setState({ title: 'Sketch', subtitle: `${sketch.strokes} strokes`, color: sketch.color })
+    }
+
+    function move(dx, dy) {
+      const x = Math.min(canvas.width - 24, Math.max(24, sketch.x + dx * STEP))
+      const y = Math.min(canvas.height - 24, Math.max(24, sketch.y + dy * STEP))
+      lines.push({ x1: sketch.x, y1: sketch.y, x2: x, y2: y, color: sketch.color })
+      Object.assign(sketch, { x, y, strokes: sketch.strokes + 1 })
+      draw()
+    }
+
+    host.on('left', () => move(-1, 0))
+    host.on('right', () => move(1, 0))
+    host.on('up', () => move(0, -1))
+    host.on('down', () => move(0, 1))
+    host.on('color', (c) => { if (c in colors) { sketch.color = c; draw() } })
+    host.on('clear', () => { lines = []; sketch.strokes = 0; draw() })
+    const keys = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
+    addEventListener('keydown', (e) => { if (keys[e.key]) { e.preventDefault(); move(...keys[e.key]) } })
+    document.getElementById('pair').addEventListener('click', () => host.showQR())
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw)
+    draw()
+    host.showQR()
+  </script>
+</body>
+</html>

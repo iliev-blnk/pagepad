@@ -27,7 +27,7 @@ export function renderOverlay(pairUrl: string, onClose: () => void): HTMLElement
   if (svg) Object.assign(svg.style, { display: 'block', width: '100%', height: 'auto' })
 
   const label = document.createElement('div')
-  label.textContent = 'Scan to control this page'
+  label.textContent = 'Scan to control'
   label.style.margin = '8px 0 2px'
 
   const link = document.createElement('a')

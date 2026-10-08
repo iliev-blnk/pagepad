@@ -67,6 +67,30 @@ describe('phone UI', () => {
     expect(f.sent).toEqual([{ action: 'next', value: null }])
   })
 
+  it('puts up to four consecutive buttons in one row', () => {
+    const f = fakePad()
+    renderApp(root, f.pad)
+    f.push(
+      {},
+      {
+        prev: { button: 'Prev' },
+        toggle: { button: 'Play' },
+        next: { button: 'Next' },
+        fade: { toggle: 'Fade' },
+        a: { button: 'A' },
+        b: { button: 'B' },
+        c: { button: 'C' },
+        d: { button: 'D' },
+        e: { button: 'E' },
+      },
+    )
+    const grids = [...root.querySelectorAll<HTMLElement>('.buttons')]
+    expect(grids.map((g) => g.style.gridTemplateColumns)).toEqual([
+      'repeat(3, 1fr)',
+      'repeat(3, 1fr)',
+    ])
+  })
+
   it('sends the opposite of the current toggle state', () => {
     const f = fakePad()
     renderApp(root, f.pad)

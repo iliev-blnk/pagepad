@@ -3,3 +3,4 @@ dist
 src/ui/generated.ts
 .superpowers
 *.log
+media/*.png

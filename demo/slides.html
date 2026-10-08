@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Slides · pagepad</title>
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .stage { flex: 1; display: grid; place-items: center; padding: 40px 24px; position: relative; }
+    .slide { width: min(880px, 100%); }
+    .slide h2 { font-size: clamp(36px, 6vw, 72px); line-height: 1.05; letter-spacing: -0.03em; margin: 0 0 20px; }
+    .slide p { font-size: clamp(18px, 2.2vw, 26px); color: var(--muted); margin: 0; max-width: 32ch; }
+    .slide code { color: var(--fg); }
+    .count { position: absolute; left: 24px; bottom: 20px; color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+    .blackout { position: fixed; inset: 0; background: #000; display: none; z-index: 10; }
+    body.dark .blackout { display: block; }
+  </style>
+</head>
+<body>
+  <div class="bar">
+    <a class="crumb" href="./">pagepad / <strong>Slides</strong></a>
+    <button type="button" class="btn" id="pair">Pair phone</button>
+  </div>
+  <div class="stage">
+    <div class="slide" id="slide"></div>
+    <div class="count" id="count"></div>
+  </div>
+  <div class="blackout"></div>
+  <script type="module">
+    import { createHost } from '/pagepad/host/index.js'
+
+    const slides = [
+      ['pagepad', 'Turn a phone into a remote for any web page.'],
+      ['Scan, don’t install', 'The QR code opens a remote in the phone’s browser. No app, no account.'],
+      ['Declare controls, get a UI', 'host.controls({ next: { button: "Next" } })'],
+      ['No WebSocket server', 'Long-polling over plain HTTP. Runs on serverless free tiers.'],
+      ['Bring your own store', 'Memory for development. Upstash Redis or Vercel Runtime Cache in production.'],
+      ['You’re using it', 'These slides are driven by pagepad.'],
+    ]
+    let index = 0
+    let dark = false
+
+    const host = await createHost({ endpoint: '/api/pad' })
+    window.__pagepad = host
+    host.controls({
+      prev: { button: 'Previous' },
+      next: { button: 'Next' },
+      blackout: { toggle: 'Blackout' },
+    })
+
+    function render() {
+      const [title, body] = slides[index]
+      const slide = document.getElementById('slide')
+      const h2 = document.createElement('h2')
+      h2.textContent = title
+      const p = document.createElement(index === 2 ? 'code' : 'p')
+      p.textContent = body
+      if (index === 2) p.style.fontSize = 'clamp(16px, 2vw, 22px)'
+      slide.replaceChildren(h2, p)
+      document.getElementById('count').textContent = `${index + 1} / ${slides.length}`
+      document.body.classList.toggle('dark', dark)
+      host.setState({ title, subtitle: `${index + 1} / ${slides.length}`, blackout: dark })
+    }
+
+    const go = (d) => { index = Math.min(slides.length - 1, Math.max(0, index + d)); render() }
+    host.on('prev', () => go(-1))
+    host.on('next', () => go(1))
+    host.on('blackout', (v) => { dark = v === true; render() })
+    addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ') go(1)
+      if (e.key === 'ArrowLeft') go(-1)
+      if (e.key === 'b') { dark = !dark; render() }
+    })
+    document.getElementById('pair').addEventListener('click', () => host.showQR())
+    render()
+    host.showQR()
+  </script>
+</body>
+</html>

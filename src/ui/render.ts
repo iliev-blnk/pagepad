@@ -177,6 +177,13 @@ export function renderApp(root: HTMLElement, pad: PadLike) {
       nodes.push(node)
       updaters.push(update)
     }
+    for (const node of nodes) {
+      if (node instanceof HTMLElement && node.className === 'buttons') {
+        const n = node.children.length
+        const columns = n <= 4 ? n : n % 4 === 0 ? 4 : 3
+        node.style.gridTemplateColumns = `repeat(${columns}, 1fr)`
+      }
+    }
     list.replaceChildren(...nodes)
   }
 

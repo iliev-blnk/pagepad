@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>pagepad demos</title>
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    main { width: min(640px, 100%); margin: 0 auto; padding: 64px 20px; }
+    h1 { font-size: 32px; letter-spacing: -0.02em; margin: 0 0 8px; }
+    .lede { font-size: 18px; color: var(--muted); margin: 0 0 40px; }
+    ul { list-style: none; padding: 0; margin: 0 0 40px; border-top: 1px solid var(--line); }
+    li a { display: flex; justify-content: space-between; gap: 16px; padding: 18px 0; border-bottom: 1px solid var(--line); text-decoration: none; }
+    li span { color: var(--muted); }
+    li a:hover strong { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>pagepad</h1>
+    <p class="lede">Turn a phone into a remote for any web page.</p>
+    <ul>
+      <li><a href="slides.html"><strong>Slides</strong><span>Previous, next, blackout</span></a></li>
+      <li><a href="player.html"><strong>Player</strong><span>Play, skip, volume, fade</span></a></li>
+      <li><a href="game.html"><strong>Sketch</strong><span>Draw with four buttons</span></a></li>
+    </ul>
+    <p class="hint">Each page shows a QR code. Scan it with your phone to get a remote built from the page's controls.
+      Open this page on your computer through its network address (printed by the demo server), not <code>localhost</code>, so the phone can reach it.</p>
+    <p class="hint"><a href="https://github.com/iliev-blnk/pagepad">Source on GitHub</a></p>
+  </main>
+</body>
+</html>
