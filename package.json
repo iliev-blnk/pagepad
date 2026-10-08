@@ -2,6 +2,22 @@
   "name": "pagepad",
   "version": "0.1.0",
   "description": "Turn a phone into a remote for any web page.",
+  "keywords": [
+    "remote",
+    "phone",
+    "qr",
+    "long-polling",
+    "serverless",
+    "presentation",
+    "second-screen"
+  ],
+  "homepage": "https://github.com/iliev-blnk/pagepad#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/iliev-blnk/pagepad.git"
+  },
+  "bugs": "https://github.com/iliev-blnk/pagepad/issues",
+  "packageManager": "pnpm@11.3.0",
   "type": "module",
   "license": "MIT",
   "author": "Ilie Beleniuc",
