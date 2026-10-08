@@ -9,6 +9,11 @@ export interface RelayOptions {
   maxWaitMs?: number
   /** HTML served to browsers that open the pair URL. */
   ui?: string
+  /**
+   * Origins allowed to call the relay from another site, or `'*'`.
+   * Default: same origin only.
+   */
+  allowOrigin?: string | string[]
 }
 
 interface Session {
@@ -173,7 +178,41 @@ export function createRelay(options: RelayOptions) {
     return json({ state, controls: session.controls, now: Date.now() })
   }
 
+  const allowed =
+    options.allowOrigin === undefined
+      ? []
+      : Array.isArray(options.allowOrigin)
+        ? options.allowOrigin
+        : [options.allowOrigin]
+
+  function corsOrigin(req: Request) {
+    const origin = req.headers.get('origin')
+    if (!origin || allowed.length === 0) return undefined
+    if (allowed.includes('*')) return '*'
+    return allowed.includes(origin) ? origin : undefined
+  }
+
   async function handler(req: Request): Promise<Response> {
+    const origin = corsOrigin(req)
+    const res = await route(req)
+    if (!origin) return res
+    const headers = new Headers(res.headers)
+    headers.set('access-control-allow-origin', origin)
+    if (origin !== '*') headers.set('vary', 'Origin')
+    return new Response(res.body, { status: res.status, headers })
+  }
+
+  async function route(req: Request): Promise<Response> {
+    if (req.method === 'OPTIONS' && corsOrigin(req)) {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          'access-control-allow-methods': 'GET, POST, OPTIONS',
+          'access-control-allow-headers': 'content-type, authorization',
+          'access-control-max-age': '86400',
+        },
+      })
+    }
     if (req.method === 'POST') {
       const text = await req.text()
       if (text.length > MAX_BODY) return fail('TOO_LARGE')

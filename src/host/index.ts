@@ -23,6 +23,8 @@ export interface Host {
   hideQR(): void
   /** URL that pairs a phone with this page. Changes if the session has to be renewed. */
   readonly pairUrl: string
+  /** Called with the new `pairUrl` when the session is renewed. Returns an unsubscribe function. */
+  onPairUrl(fn: (url: string) => void): () => void
   close(): void
 }
 
@@ -114,6 +116,8 @@ export async function createHost(options: HostOptions): Promise<Host> {
       timers.add(t)
     })
 
+  const pairFns = new Set<(url: string) => void>()
+
   async function renew() {
     creds = await createSession()
     since = 0
@@ -121,6 +125,7 @@ export async function createHost(options: HostOptions): Promise<Host> {
       hideQR()
       showQR()
     }
+    for (const fn of pairFns) fn(pairUrl())
     void sendState()
   }
 
@@ -231,6 +236,10 @@ export async function createHost(options: HostOptions): Promise<Host> {
     hideQR,
     get pairUrl() {
       return pairUrl()
+    },
+    onPairUrl(fn) {
+      pairFns.add(fn)
+      return () => void pairFns.delete(fn)
     },
     close() {
       if (closed) return

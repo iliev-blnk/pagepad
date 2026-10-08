@@ -189,9 +189,12 @@ describe('createHost', () => {
       return new Response('down', { status: 503 })
     })
     host = await createHost({ endpoint: '/api/pad', fetch: stub.fetch })
+    const onPair = vi.fn()
+    host.onPairUrl(onPair)
     host.showQR()
     await vi.advanceTimersByTimeAsync(0)
     expect(stub.of('create').length).toBe(2)
+    expect(onPair).toHaveBeenCalledWith('https://x.test/api/pad?s=ID#SEC')
   })
 
   it('shows and hides the QR overlay', async () => {

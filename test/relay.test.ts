@@ -58,3 +58,51 @@ describe('createRelay', () => {
     warn.mockRestore()
   })
 })
+
+describe('cross-origin access', () => {
+  const preflight = (origin: string) =>
+    new Request('https://relay.test/api/pad', {
+      method: 'OPTIONS',
+      headers: {
+        origin,
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type',
+      },
+    })
+  const create = (origin: string) =>
+    new Request('https://relay.test/api/pad', {
+      method: 'POST',
+      headers: { origin, 'content-type': 'application/json' },
+      body: JSON.stringify({ op: 'create' }),
+    })
+
+  it('answers preflights and tags responses for an allowed origin', async () => {
+    const relay = createRelay({ store: memoryStore(), allowOrigin: ['https://app.test'] })
+    const pre = await relay.handler(preflight('https://app.test'))
+    expect(pre.status).toBe(204)
+    expect(pre.headers.get('access-control-allow-origin')).toBe('https://app.test')
+    expect(pre.headers.get('access-control-allow-methods')).toBe('GET, POST, OPTIONS')
+    expect(pre.headers.get('access-control-allow-headers')).toBe('content-type, authorization')
+    const res = await relay.handler(create('https://app.test'))
+    expect(res.headers.get('access-control-allow-origin')).toBe('https://app.test')
+    expect(res.headers.get('vary')).toBe('Origin')
+  })
+
+  it('leaves other origins without CORS headers', async () => {
+    const relay = createRelay({ store: memoryStore(), allowOrigin: 'https://app.test' })
+    const res = await relay.handler(create('https://evil.test'))
+    expect(res.headers.get('access-control-allow-origin')).toBeNull()
+  })
+
+  it('allows any origin with "*"', async () => {
+    const relay = createRelay({ store: memoryStore(), allowOrigin: '*' })
+    const res = await relay.handler(create('https://anything.test'))
+    expect(res.headers.get('access-control-allow-origin')).toBe('*')
+  })
+
+  it('is same-origin only by default', async () => {
+    const relay = createRelay({ store: memoryStore() })
+    const res = await relay.handler(create('https://app.test'))
+    expect(res.headers.get('access-control-allow-origin')).toBeNull()
+  })
+})
