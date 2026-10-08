@@ -206,6 +206,23 @@ describe('createHost', () => {
     expect(document.querySelector('[data-pagepad-qr]')).toBeNull()
   })
 
+  it('ends the session on the relay when closed', async () => {
+    const stub = stubFetch()
+    host = await createHost({ endpoint: '/api/pad', fetch: stub.fetch })
+    host.close()
+    const end = stub.of('end')
+    expect(end).toHaveLength(1)
+    expect(end[0]?.body).toEqual({ op: 'end', id: 'ID', hostToken: 'HOST' })
+    expect(end[0]?.init?.keepalive).toBe(true)
+  })
+
+  it('ends the session when the page is hidden for navigation', async () => {
+    const stub = stubFetch()
+    host = await createHost({ endpoint: '/api/pad', fetch: stub.fetch })
+    window.dispatchEvent(new Event('pagehide'))
+    expect(stub.of('end')).toHaveLength(1)
+  })
+
   it('stops all requests after close', async () => {
     vi.useFakeTimers()
     const stub = stubFetch(() => new Response('down', { status: 503 }))

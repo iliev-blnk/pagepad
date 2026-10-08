@@ -62,4 +62,20 @@ describe('pairing a phone with the player demo', () => {
     )
     await expect.poll(() => phone.locator('h1').textContent(), { timeout: 3000 }).toBe(title)
   })
+
+  it('tells the phone the session ended when the page reloads', async () => {
+    const desktop = await browser.newPage()
+    await desktop.goto(`${base}/slides.html`)
+    await desktop.waitForFunction(() => '__pagepad' in window)
+    const pairUrl = await desktop.evaluate(
+      () => (window as unknown as { __pagepad: { pairUrl: string } }).__pagepad.pairUrl,
+    )
+    const phone = await browser.newPage({ viewport: { width: 390, height: 844 } })
+    await phone.goto(pairUrl)
+    await phone.waitForSelector('.status.live')
+    await desktop.reload()
+    await expect
+      .poll(() => phone.locator('body').textContent(), { timeout: 5000 })
+      .toContain('Session ended — scan the code again')
+  })
 })

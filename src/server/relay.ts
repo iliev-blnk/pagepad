@@ -19,7 +19,9 @@ interface Session {
 
 type ErrorCode = 'UNAUTHORIZED' | 'NOT_FOUND' | 'BAD_REQUEST' | 'UNKNOWN_ACTION' | 'TOO_LARGE'
 
-const SESSION_TTL = 3600
+// Refreshed by every host state post (at least every 10 s), so a closed page
+// shows up as ended on the phone within two minutes even without `op: 'end'`.
+const SESSION_TTL = 120
 const QUEUE_MAX = 50
 const STALE_MS = 60_000
 const MAX_STATE = 16 * 1024
@@ -134,6 +136,16 @@ export function createRelay(options: RelayOptions) {
     return json(fresh(await store.range(k.queue), Number(body.since) || 0))
   }
 
+  async function end(body: Record<string, unknown>) {
+    const id = body.id as string
+    const session = await load(id)
+    if (!session) return json({ ok: true })
+    if (!(await check(session.hostHash, body.hostToken))) return fail('UNAUTHORIZED')
+    const k = keys(id)
+    await Promise.all([store.set(k.session, null, 60), store.set(k.state, null, 60)])
+    return json({ ok: true })
+  }
+
   async function poll(req: Request, params: URLSearchParams) {
     const id = params.get('id') ?? ''
     const session = await load(id)
@@ -174,6 +186,7 @@ export function createRelay(options: RelayOptions) {
       if (body.op === 'create') return create()
       if (body.op === 'cmd') return command(body)
       if (body.op === 'state') return hostState(body)
+      if (body.op === 'end') return end(body)
       return fail('BAD_REQUEST')
     }
 

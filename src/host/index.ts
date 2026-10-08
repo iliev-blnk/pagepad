@@ -184,6 +184,19 @@ export async function createHost(options: HostOptions): Promise<Host> {
 
   const heartbeat = setInterval(() => void sendState(), HEARTBEAT_MS)
 
+  // Tell the relay the page is gone so the phone shows "session ended" at once.
+  // keepalive lets the request outlive the page.
+  function endSession() {
+    void doFetch(endpoint, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ op: 'end', id: creds.id, hostToken: creds.hostToken }),
+      keepalive: true,
+    }).catch(() => {})
+  }
+
+  if (typeof addEventListener === 'function') addEventListener('pagehide', endSession)
+
   function showQR() {
     if (overlay || typeof document === 'undefined') return
     overlay = renderOverlay(pairUrl(), hideQR)
@@ -220,7 +233,10 @@ export async function createHost(options: HostOptions): Promise<Host> {
       return pairUrl()
     },
     close() {
+      if (closed) return
       closed = true
+      endSession()
+      if (typeof removeEventListener === 'function') removeEventListener('pagehide', endSession)
       abort.abort()
       clearInterval(heartbeat)
       clearTimeout(batchTimer)

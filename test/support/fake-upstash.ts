@@ -3,15 +3,20 @@ type Cmd = string[]
 /** Minimal in-memory interpreter for the Upstash REST commands pagepad uses. */
 export function fakeUpstash(options: { delay?: (n: number) => number } = {}) {
   const strings = new Map<string, string>()
+  const expires = new Map<string, number>()
   const lists = new Map<string, string[]>()
   const requests: { url: string; auth: string | null; body: unknown }[] = []
 
   const run = ([op, key = '', ...args]: Cmd): unknown => {
     switch (op) {
-      case 'GET':
+      case 'GET': {
+        const at = expires.get(key)
+        if (at !== undefined && at <= Date.now()) strings.delete(key)
         return strings.get(key) ?? null
+      }
       case 'SET':
         strings.set(key, args[0] ?? '')
+        if (args[1] === 'EX') expires.set(key, Date.now() + Number(args[2]) * 1000)
         return 'OK'
       case 'INCR': {
         const n = Number(strings.get(key) ?? 0) + 1

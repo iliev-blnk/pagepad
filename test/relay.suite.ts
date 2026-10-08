@@ -262,6 +262,28 @@ export function relaySuite(name: string, makeStore: () => Store) {
       expect(res.body.cmds.map((c: { id: number }) => c.id)).toEqual([1, 2])
     })
 
+    it('ends a session so the phone sees it is gone', async () => {
+      const relay = make()
+      const s = await session(relay)
+      const wrong = await call(relay, 'POST', { op: 'end', id: s.id, hostToken: s.secret })
+      expect(wrong.status).toBe(401)
+      const res = await call(relay, 'POST', { op: 'end', id: s.id, hostToken: s.hostToken })
+      expect(res.status).toBe(200)
+      const phone = await call(relay, 'GET', { op: 'state', id: s.id }, s.secret)
+      expect(phone.status).toBe(404)
+      const cmd = await call(relay, 'POST', { op: 'cmd', id: s.id, secret: s.secret, action: 'a' })
+      expect(cmd.status).toBe(404)
+    })
+
+    it('expires a session two minutes after the host goes quiet', async () => {
+      const relay = make()
+      const s = await session(relay)
+      const now = Date.now()
+      vi.spyOn(Date, 'now').mockReturnValue(now + 121_000)
+      const phone = await call(relay, 'GET', { op: 'state', id: s.id }, s.secret)
+      expect(phone.status).toBe(404)
+    })
+
     it('rejects an unknown op', async () => {
       const res = await call(make(), 'POST', { op: 'dance' })
       expect(res.status).toBe(400)
