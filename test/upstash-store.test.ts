@@ -6,26 +6,40 @@ import { fakeUpstash } from './support/fake-upstash'
 const URL_ = 'https://eu1-x.upstash.io'
 
 describe('upstashStore', () => {
-  it('takes an id with INCR, then pushes, trims and expires in one transaction', async () => {
+  it('pushes with one atomic EVAL request', async () => {
     const up = fakeUpstash()
     const store = upstashStore({ url: URL_, token: 'tok', fetch: up.fetch })
     expect(await store.push('q', { a: 1 }, { max: 50, ttlSec: 60 })).toBe(1)
-    expect(up.requests).toHaveLength(2)
-    expect(up.requests[0]).toEqual({ url: URL_, auth: 'Bearer tok', body: ['INCR', 'q:seq'] })
-    const tx = up.requests[1]
-    expect(tx?.url).toBe(`${URL_}/multi-exec`)
-    expect(tx?.auth).toBe('Bearer tok')
-    const body = tx?.body as string[][]
-    expect(body[0]?.slice(0, 2)).toEqual(['RPUSH', 'q'])
-    expect(JSON.parse(body[0]?.[2] ?? '')).toEqual({ a: 1, id: 1 })
-    expect(body.slice(1)).toEqual([
-      ['LTRIM', 'q', '-50', '-1'],
-      ['EXPIRE', 'q', '60'],
-      ['EXPIRE', 'q:seq', '60'],
-    ])
+    expect(up.requests).toHaveLength(1)
+    const req = up.requests[0]
+    expect(req?.url).toBe(URL_)
+    expect(req?.auth).toBe('Bearer tok')
+    const [op, script, numKeys, ...rest] = req?.body as string[]
+    expect(op).toBe('EVAL')
+    expect(script).toContain("redis.call('INCR', KEYS[2])")
+    expect(numKeys).toBe('2')
+    expect(rest).toEqual(['q', 'q:seq', '{"a":1}', '50', '60'])
+    const { items } = await store.range('q')
+    expect(items).toEqual([{ id: 1, a: 1 }])
   })
 
-  it('reads seq and items in one pipeline, sorted by id', async () => {
+  it('never shows a seq whose command is missing while pushes interleave', async () => {
+    const up = fakeUpstash({ delay: (n) => (n * 7) % 13 })
+    const store = upstashStore({ url: URL_, token: 'tok', fetch: up.fetch })
+    const opts = { max: 50, ttlSec: 60 }
+    const work: Promise<unknown>[] = []
+    const snapshots: Promise<{ seq: number; items: { id: number }[] }>[] = []
+    for (let i = 0; i < 12; i++) {
+      work.push(store.push('q', { n: i }, opts))
+      snapshots.push(store.range('q'))
+    }
+    await Promise.all(work)
+    for (const snap of await Promise.all(snapshots)) {
+      expect(snap.items.map((c) => c.id)).toEqual(Array.from({ length: snap.seq }, (_, i) => i + 1))
+    }
+  })
+
+  it('reads seq and items in one transaction, sorted by id', async () => {
     const up = fakeUpstash()
     const store = upstashStore({ url: URL_, token: 'tok', fetch: up.fetch })
     await up.fetch(`${URL_}/pipeline`, {
@@ -43,7 +57,7 @@ describe('upstashStore', () => {
     up.requests.length = 0
     const { seq, items } = await store.range('q')
     expect(up.requests[0]).toMatchObject({
-      url: `${URL_}/pipeline`,
+      url: `${URL_}/multi-exec`,
       body: [
         ['GET', 'q:seq'],
         ['LRANGE', 'q', '0', '-1'],

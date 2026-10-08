@@ -10,9 +10,19 @@ export interface UpstashOptions {
 
 type Reply = { result?: unknown; error?: string }
 
+// Takes the next id and stores the command in one atomic step, so a reader can
+// never see a seq whose command is not in the list yet. ARGV[1] is the command
+// as a JSON object; the id is spliced in as its first field.
+const PUSH = `local id = redis.call('INCR', KEYS[2])
+redis.call('RPUSH', KEYS[1], '{"id":' .. id .. ',' .. string.sub(ARGV[1], 2))
+redis.call('LTRIM', KEYS[1], -tonumber(ARGV[2]), -1)
+redis.call('EXPIRE', KEYS[1], ARGV[3])
+redis.call('EXPIRE', KEYS[2], ARGV[3])
+return id`
+
 /**
- * Upstash Redis over its REST API. Atomic: ids come from INCR and the
- * push/trim/expire runs as one MULTI/EXEC transaction.
+ * Upstash Redis over its REST API. Atomic: each push is one Lua script and
+ * each read is one MULTI/EXEC transaction.
  */
 export function upstashStore(options: UpstashOptions): Store {
   const base = options.url.replace(/\/+$/, '')
@@ -46,17 +56,14 @@ export function upstashStore(options: UpstashOptions): Store {
       await one(['SET', key, JSON.stringify(value), 'EX', String(ttlSec)])
     },
     async push(key, item, { max, ttlSec }) {
-      const id = Number(await one(['INCR', `${key}:seq`]))
-      await many('/multi-exec', [
-        ['RPUSH', key, JSON.stringify({ ...item, id })],
-        ['LTRIM', key, String(-max), '-1'],
-        ['EXPIRE', key, String(ttlSec)],
-        ['EXPIRE', `${key}:seq`, String(ttlSec)],
-      ])
-      return id
+      const json = JSON.stringify(item)
+      if (!json.startsWith('{"')) throw new Error('[pagepad] queue items must be non-empty objects')
+      return Number(
+        await one(['EVAL', PUSH, '2', key, `${key}:seq`, json, String(max), String(ttlSec)]),
+      )
     },
     async range(key) {
-      const [seq, list] = await many('/pipeline', [
+      const [seq, list] = await many('/multi-exec', [
         ['GET', `${key}:seq`],
         ['LRANGE', key, '0', '-1'],
       ])

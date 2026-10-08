@@ -1,7 +1,7 @@
 type Cmd = string[]
 
 /** Minimal in-memory interpreter for the Upstash REST commands pagepad uses. */
-export function fakeUpstash() {
+export function fakeUpstash(options: { delay?: (n: number) => number } = {}) {
   const strings = new Map<string, string>()
   const lists = new Map<string, string[]>()
   const requests: { url: string; auth: string | null; body: unknown }[] = []
@@ -34,12 +34,24 @@ export function fakeUpstash() {
         return [...(lists.get(key) ?? [])]
       case 'EXPIRE':
         return 1
+      case 'EVAL': {
+        // Emulates the push script in src/stores/upstash.ts: one atomic step.
+        const [, , queueKey = '', seqKey = '', json = '', max = '0', ttl = '0'] = [key, ...args]
+        const id = run(['INCR', seqKey]) as number
+        run(['RPUSH', queueKey, `{"id":${id},${json.slice(1)}`])
+        run(['LTRIM', queueKey, String(-Number(max)), '-1'])
+        void ttl
+        return id
+      }
       default:
         throw new Error(`fake upstash: unsupported ${op}`)
     }
   }
 
+  let count = 0
   const fetch = async (input: string | URL | Request, init?: RequestInit) => {
+    const wait = options.delay?.(count++) ?? 0
+    if (wait) await new Promise((r) => setTimeout(r, wait))
     const url = String(input)
     const body = JSON.parse(String(init?.body))
     const auth = new Headers(init?.headers).get('authorization')
