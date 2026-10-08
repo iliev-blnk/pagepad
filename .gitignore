@@ -6,3 +6,4 @@ src/ui/generated.ts
 media/*.png
 deploy/cloudflare/site
 deploy/cloudflare/.wrangler
+deploy/cloudflare/.secrets.json
