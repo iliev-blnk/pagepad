@@ -1,0 +1,68 @@
+{
+  "name": "pagepad",
+  "version": "0.1.0",
+  "description": "Turn a phone into a remote for any web page.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Ilie Beleniuc",
+  "engines": {
+    "node": ">=20"
+  },
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    "./host": {
+      "types": "./dist/host/index.d.ts",
+      "import": "./dist/host/index.js"
+    },
+    "./remote": {
+      "types": "./dist/remote/index.d.ts",
+      "import": "./dist/remote/index.js"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.js"
+    },
+    "./node": {
+      "types": "./dist/node/index.d.ts",
+      "import": "./dist/node/index.js"
+    },
+    "./stores/upstash": {
+      "types": "./dist/stores/upstash.d.ts",
+      "import": "./dist/stores/upstash.js"
+    },
+    "./stores/vercel": {
+      "types": "./dist/stores/vercel.d.ts",
+      "import": "./dist/stores/vercel.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check ."
+  },
+  "peerDependencies": {
+    "@vercel/functions": ">=2"
+  },
+  "peerDependenciesMeta": {
+    "@vercel/functions": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.15",
+    "@types/node": "^26.6.4",
+    "@vercel/functions": "^3.9.11",
+    "esbuild": "^0.28.2",
+    "happy-dom": "^20.14.5",
+    "playwright-core": "^1.63.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "uqr": "^0.1.3",
+    "vitest": "^5.0.3"
+  }
+}
